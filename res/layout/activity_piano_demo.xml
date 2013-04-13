@@ -1,0 +1,17 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:piano="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".PianoDemoActivity" >
+
+    <com.evilduck.piano.views.instrument.PianoView
+        android:id="@+id/instrument_view"
+        android:layout_width="match_parent"
+        android:layout_height="300dip"
+        piano:overlay_bitmaps="true"
+        piano:overlay_circle_radius="18dip"
+        piano:overlay_circle_text_size="18sp"
+        piano:overlay_color="#00FF00" />
+
+</RelativeLayout>
