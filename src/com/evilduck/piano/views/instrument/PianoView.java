@@ -256,6 +256,7 @@ public class PianoView extends View {
 	}
 
 	if (measurementChanged) {
+	    measurementChanged = false;
 	    instrument.initializeInstrument(getMeasuredHeight(), getContext());
 	    instrumentWidth = instrument.getWidth();
 	}
