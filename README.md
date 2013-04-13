@@ -1,4 +1,4 @@
-custom_view_keyboard
+Piano Keyboard Showcase
 ====================
 
 A simple showcase for creating an intercative custom component like a piano keyboard.
