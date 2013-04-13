@@ -16,18 +16,25 @@ package com.evilduck.piano;
 
 import java.util.Arrays;
 
+import android.animation.ValueAnimator;
+import android.animation.ValueAnimator.AnimatorUpdateListener;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.animation.DecelerateInterpolator;
 
 import com.evilduck.piano.music.Note;
 import com.evilduck.piano.views.instrument.PianoView;
 import com.evilduck.piano.views.instrument.PianoView.OnKeyTouchListener;
 
+@SuppressLint("NewApi")
 public class PianoDemoActivity extends Activity {
 
     private PianoView pianoView;
+
+    private boolean scaledDown = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,10 +69,44 @@ public class PianoDemoActivity extends Activity {
 	case R.id.action_clear:
 	    pianoView.clear();
 	    break;
+	case R.id.action_scale:
+	    if (!scaledDown) {
+		scaleDown();
+	    } else {
+		scaleUp();
+	    }
+	    scaledDown = !scaledDown;
+	    break;
 	default:
 	    break;
 	}
 	return super.onOptionsItemSelected(item);
+    }
+
+    private void scaleDown() {
+	ValueAnimator va = ValueAnimator.ofInt(pianoView.getHeight(), pianoView.getHeight() / 2);
+	va.setInterpolator(new DecelerateInterpolator());
+	va.addUpdateListener(new AnimatorUpdateListener() {
+	    @Override
+	    public void onAnimationUpdate(ValueAnimator animation) {
+		pianoView.getLayoutParams().height = (Integer) animation.getAnimatedValue();
+		pianoView.requestLayout();
+	    }
+	});
+	va.start();
+    }
+
+    private void scaleUp() {
+	ValueAnimator va = ValueAnimator.ofInt(pianoView.getHeight(), pianoView.getHeight() * 2);
+	va.setInterpolator(new DecelerateInterpolator());
+	va.addUpdateListener(new AnimatorUpdateListener() {
+	    @Override
+	    public void onAnimationUpdate(ValueAnimator animation) {
+		pianoView.getLayoutParams().height = (Integer) animation.getAnimatedValue();
+		pianoView.requestLayout();
+	    }
+	});
+	va.start();
     }
 
     // private ArrayList<Note> getAllNotes() {

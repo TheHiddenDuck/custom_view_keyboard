@@ -6,5 +6,11 @@
         android:orderInCategory="100"
         android:showAsAction="ifRoom"
         android:title="@string/remove"/>
+    
+    <item
+        android:id="@+id/action_scale"
+        android:orderInCategory="100"
+        android:showAsAction="ifRoom"
+        android:title="@string/scale"/>
 
 </menu>

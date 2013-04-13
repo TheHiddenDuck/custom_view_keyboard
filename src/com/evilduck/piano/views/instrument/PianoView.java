@@ -71,6 +71,8 @@ public class PianoView extends View {
 
     private ArrayList<Note> notesToDraw = new ArrayList<Note>();
 
+    private boolean measurementChanged = false;
+
     public PianoView(Context context, AttributeSet attrs) {
 	super(context, attrs);
 
@@ -253,7 +255,7 @@ public class PianoView extends View {
 	    }
 	}
 
-	if (!instrument.isInitialized()) {
+	if (measurementChanged) {
 	    instrument.initializeInstrument(getMeasuredHeight(), getContext());
 	    instrumentWidth = instrument.getWidth();
 	}
@@ -290,6 +292,9 @@ public class PianoView extends View {
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 	canvasWidth = MeasureSpec.getSize(widthMeasureSpec);
+	measurementChanged = true;
+	Log.d(VIEW_LOG_TAG, "measurement changed");
+
 	super.onMeasure(widthMeasureSpec, heightMeasureSpec);
     }
 

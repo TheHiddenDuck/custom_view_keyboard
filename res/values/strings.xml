@@ -4,5 +4,6 @@
     <string name="app_name">Piano Showcase</string>
     <string name="action_settings">Settings</string>
     <string name="remove">Remove</string>
+    <string name="scale">Scale</string>
 
 </resources>
