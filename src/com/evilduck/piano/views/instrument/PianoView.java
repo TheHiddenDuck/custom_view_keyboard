@@ -33,6 +33,8 @@ import android.util.TypedValue;
 import android.view.GestureDetector;
 import android.view.GestureDetector.OnGestureListener;
 import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
+import android.view.ScaleGestureDetector.OnScaleGestureListener;
 import android.view.View;
 import android.widget.OverScroller;
 
@@ -47,6 +49,8 @@ public class PianoView extends View {
 
     private GestureDetector gestureDetector;
 
+    private ScaleGestureDetector scaleGestureDetector;
+
     private int canvasWidth;
 
     private int instrumentWidth;
@@ -60,6 +64,10 @@ public class PianoView extends View {
     private EdgeEffectCompat rightEdgeEffect;
 
     private int flingDirection = 0;
+
+    private float scaleX = 1.0f;
+
+    private boolean isScaling = false;
 
     private ArrayList<Note> notesToDraw = new ArrayList<Note>();
 
@@ -120,6 +128,7 @@ public class PianoView extends View {
 	if (!isInEditMode()) {
 	    scroller = new OverScroller(getContext());
 	    gestureDetector = new GestureDetector(getContext(), gestureListener);
+	    scaleGestureDetector = new ScaleGestureDetector(getContext(), scaleGestureListener);
 	}
     }
 
@@ -252,6 +261,7 @@ public class PianoView extends View {
 	int localXOffset = getOffsetInsideOfBounds();
 
 	canvas.save();
+	canvas.scale(scaleX, 1.0f);
 	canvas.translate(-localXOffset, 0);
 
 	instrument.updateBounds(localXOffset, canvasWidth + localXOffset);
@@ -320,7 +330,14 @@ public class PianoView extends View {
 	    rightEdgeEffect.onRelease();
 	    ViewCompat.postInvalidateOnAnimation(this);
 	}
-	return super.onTouchEvent(event) || gestureDetector.onTouchEvent(event);
+
+	boolean result = super.onTouchEvent(event);
+	result |= scaleGestureDetector.onTouchEvent(event);
+	if (!isScaling) {
+	    result |= gestureDetector.onTouchEvent(event);
+	}
+
+	return result;
     }
 
     private void fireTouchListeners(int code) {
@@ -347,11 +364,40 @@ public class PianoView extends View {
 
     }
 
+    private OnScaleGestureListener scaleGestureListener = new OnScaleGestureListener() {
+
+	@Override
+	public void onScaleEnd(ScaleGestureDetector detector) {
+	    isScaling = false;
+	}
+
+	@Override
+	public boolean onScaleBegin(ScaleGestureDetector detector) {
+	    isScaling = true;
+	    return true;
+	}
+
+	@Override
+	public boolean onScale(ScaleGestureDetector detector) {
+	    Log.d(VIEW_LOG_TAG, "Scale: " + detector.getScaleFactor());
+
+	    scaleX *= detector.getScaleFactor();
+	    if (scaleX < 1) {
+		scaleX = 1;
+	    }
+	    if (scaleX > 2) {
+		scaleX = 2;
+	    }
+	    invalidate();
+	    return true;
+	}
+    };
+
     private OnGestureListener gestureListener = new GestureDetector.SimpleOnGestureListener() {
 
 	public boolean onDown(MotionEvent e) {
 	    scroller.forceFinished(true);
-	    if (instrument.touchItem(e.getX() + xOffset, e.getY())) {
+	    if (instrument.touchItem(e.getX() / scaleX + xOffset, e.getY())) {
 		invalidate();
 	    }
 
