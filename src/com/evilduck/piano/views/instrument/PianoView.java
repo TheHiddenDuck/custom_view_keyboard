@@ -258,7 +258,12 @@ public class PianoView extends View {
 	if (measurementChanged) {
 	    measurementChanged = false;
 	    instrument.initializeInstrument(getMeasuredHeight(), getContext());
+
+	    float oldInstrumentWidth = instrumentWidth;
 	    instrumentWidth = instrument.getWidth();
+
+	    float ratio = (float) instrumentWidth / oldInstrumentWidth;
+	    xOffset = (int) (xOffset * ratio);
 	}
 
 	int localXOffset = getOffsetInsideOfBounds();
