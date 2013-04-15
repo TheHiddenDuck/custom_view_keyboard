@@ -33,6 +33,10 @@ import com.evilduck.piano.music.Note;
 
 class Keyboard {
 
+    private static final float BLACK_KEY_HEIGHT_PERCENT = 1.57f;
+
+    private static final float WHITE_KEY_ASPECT_RATIO = 6.12f;
+
     private static final int OCTAVES = 4;
 
     private static final int START_MIDI_CODE = Note.C.inOctave(2).getMidiCode();
@@ -250,11 +254,11 @@ class Keyboard {
     }
 
     public void initializeInstrument(float measuredHeight, Context context) {
-	whiteKeyWidth = Math.round(measuredHeight / 6.12f);
+	whiteKeyWidth = Math.round(measuredHeight / WHITE_KEY_ASPECT_RATIO);
 	octaveWidth = whiteKeyWidth * 7;
 
 	int blackHalfWidth = octaveWidth / 20;
-	blackKeyHeight = Math.round(measuredHeight / 1.57f);
+	blackKeyHeight = Math.round(measuredHeight / BLACK_KEY_HEIGHT_PERCENT);
 
 	keysArray = new Key[KEYS_IN_OCTAVE * OCTAVES];
 	int whiteIndex = 0;
@@ -262,7 +266,7 @@ class Keyboard {
 	for (int i = 0; i < KEYS_IN_OCTAVE; i++) {
 
 	    Key key = new Key();
-	    if (i == 0 || i == 2 || i == 4 || i == 5 || i == 7 || i == 9 || i == 11) {
+	    if (isWhite(i)) {
 		key.black = false;
 		key.setBounds(whiteKeyWidth * whiteIndex, whiteKeyWidth * whiteIndex + whiteKeyWidth, 0, measuredHeight);
 		whiteIndex++;
@@ -285,6 +289,10 @@ class Keyboard {
 	    key.midiCode = START_MIDI_CODE + i;
 	    keysArray[i] = key;
 	}
+    }
+
+    private static boolean isWhite(int i) {
+	return i == 0 || i == 2 || i == 4 || i == 5 || i == 7 || i == 9 || i == 11;
     }
 
     public boolean touchItem(float x, float y) {

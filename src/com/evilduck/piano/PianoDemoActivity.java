@@ -19,7 +19,9 @@ import java.util.Arrays;
 import android.animation.ValueAnimator;
 import android.animation.ValueAnimator.AnimatorUpdateListener;
 import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
 import android.app.Activity;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -64,16 +66,27 @@ public class PianoDemoActivity extends Activity {
     }
 
     @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+	if (Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
+	    menu.findItem(R.id.action_scale).setVisible(false);
+	}
+
+	return super.onPrepareOptionsMenu(menu);
+    }
+
+    @Override
     public boolean onOptionsItemSelected(MenuItem item) {
 	switch (item.getItemId()) {
 	case R.id.action_clear:
 	    pianoView.clear();
 	    break;
 	case R.id.action_scale:
-	    if (!scaledDown) {
-		scaleDown();
-	    } else {
-		scaleUp();
+	    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+		if (!scaledDown) {
+		    scaleDown();
+		} else {
+		    scaleUp();
+		}
 	    }
 	    scaledDown = !scaledDown;
 	    break;
@@ -83,6 +96,7 @@ public class PianoDemoActivity extends Activity {
 	return super.onOptionsItemSelected(item);
     }
 
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     private void scaleDown() {
 	ValueAnimator va = ValueAnimator.ofInt(pianoView.getHeight(), pianoView.getHeight() / 2);
 	va.setInterpolator(new DecelerateInterpolator());
@@ -96,6 +110,7 @@ public class PianoDemoActivity extends Activity {
 	va.start();
     }
 
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     private void scaleUp() {
 	ValueAnimator va = ValueAnimator.ofInt(pianoView.getHeight(), pianoView.getHeight() * 2);
 	va.setInterpolator(new DecelerateInterpolator());
