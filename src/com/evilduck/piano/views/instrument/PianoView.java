@@ -55,7 +55,7 @@ public class PianoView extends View {
 
     private int instrumentWidth;
 
-    private Keyboard instrument;
+    private Keyboard keyboard;
 
     private OnKeyTouchListener onTouchListener;
 
@@ -105,7 +105,7 @@ public class PianoView extends View {
 	    pianoAttrs.recycle();
 	}
 
-	instrument = new Keyboard(getContext(), asBitmaps, circleColor, circleRadius, circleTextSize);
+	keyboard = new Keyboard(getContext(), asBitmaps, circleColor, circleRadius, circleTextSize);
     }
 
     public void addNotes(List<Note> notes) {
@@ -145,6 +145,7 @@ public class PianoView extends View {
 	SavedState st = new SavedState(super.onSaveInstanceState());
 
 	st.xOffset = xOffset;
+	st.instrumentWidth = instrumentWidth;
 	return st;
     }
 
@@ -158,11 +159,13 @@ public class PianoView extends View {
 	super.onRestoreInstanceState(ss.getSuperState());
 
 	xOffset = ss.xOffset;
+	instrumentWidth = ss.instrumentWidth;
     };
 
     public static class SavedState extends BaseSavedState {
 
 	int xOffset;
+	int instrumentWidth;
 
 	SavedState(Parcelable superState) {
 	    super(superState);
@@ -172,6 +175,7 @@ public class PianoView extends View {
 	public void writeToParcel(Parcel out, int flags) {
 	    super.writeToParcel(out, flags);
 	    out.writeInt(xOffset);
+	    out.writeInt(instrumentWidth);
 	}
 
 	public static final Parcelable.Creator<SavedState> CREATOR = new Parcelable.Creator<SavedState>() {
@@ -187,6 +191,7 @@ public class PianoView extends View {
 	private SavedState(Parcel in) {
 	    super(in);
 	    xOffset = in.readInt();
+	    instrumentWidth = in.readInt();
 	}
 
     }
@@ -257,10 +262,10 @@ public class PianoView extends View {
 
 	if (measurementChanged) {
 	    measurementChanged = false;
-	    instrument.initializeInstrument(getMeasuredHeight(), getContext());
+	    keyboard.initializeInstrument(getMeasuredHeight(), getContext());
 
 	    float oldInstrumentWidth = instrumentWidth;
-	    instrumentWidth = instrument.getWidth();
+	    instrumentWidth = keyboard.getWidth();
 
 	    float ratio = (float) instrumentWidth / oldInstrumentWidth;
 	    xOffset = (int) (xOffset * ratio);
@@ -272,11 +277,11 @@ public class PianoView extends View {
 	canvas.scale(scaleX, 1.0f);
 	canvas.translate(-localXOffset, 0);
 
-	instrument.updateBounds(localXOffset, canvasWidth + localXOffset);
-	instrument.draw(canvas);
+	keyboard.updateBounds(localXOffset, canvasWidth + localXOffset);
+	keyboard.draw(canvas);
 
 	if (!notesToDraw.isEmpty()) {
-	    instrument.drawOverlays(notesToDraw, canvas);
+	    keyboard.drawOverlays(notesToDraw, canvas);
 	}
 
 	canvas.restore();
@@ -408,7 +413,7 @@ public class PianoView extends View {
 
 	public boolean onDown(MotionEvent e) {
 	    scroller.forceFinished(true);
-	    if (instrument.touchItem(e.getX() / scaleX + xOffset, e.getY())) {
+	    if (keyboard.touchItem(e.getX() / scaleX + xOffset, e.getY())) {
 		invalidate();
 	    }
 
@@ -437,21 +442,21 @@ public class PianoView extends View {
 	    }
 
 	    if (!awakenScrollBars()) {
-		ViewCompat.postInvalidateOnAnimation(PianoView.this);
+		invalidate();
 	    }
 
 	    return true;
 	}
 
 	public boolean onSingleTapUp(MotionEvent e) {
-	    fireTouchListeners(instrument.getTouchedCode());
+	    fireTouchListeners(keyboard.getTouchedCode());
 
 	    resetTouchFeedback();
 	    return super.onSingleTapUp(e);
 	}
 
 	public void onLongPress(MotionEvent e) {
-	    fireLongTouchListeners(instrument.getTouchedCode());
+	    fireLongTouchListeners(keyboard.getTouchedCode());
 
 	    super.onLongPress(e);
 	    resetTouchFeedback();
@@ -465,7 +470,7 @@ public class PianoView extends View {
     };
 
     private void resetTouchFeedback() {
-	if (instrument.releaseTouch()) {
+	if (keyboard.releaseTouch()) {
 	    invalidate();
 	}
     };
