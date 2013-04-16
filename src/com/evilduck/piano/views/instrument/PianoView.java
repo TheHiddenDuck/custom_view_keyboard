@@ -63,15 +63,17 @@ public class PianoView extends View {
 
     private EdgeEffectCompat rightEdgeEffect;
 
-    private int flingDirection = 0;
-
     private float scaleX = 1.0f;
-
-    private boolean isScaling = false;
 
     private ArrayList<Note> notesToDraw = new ArrayList<Note>();
 
     private boolean measurementChanged = false;
+
+    private int scrollDirection;
+
+    private boolean leftEdgeEffectActive = false;
+
+    private boolean rightEdgeEffectActive = false;
 
     public PianoView(Context context, AttributeSet attrs) {
 	super(context, attrs);
@@ -96,7 +98,7 @@ public class PianoView extends View {
 	float circleTextSize;
 	try {
 	    asBitmaps = pianoAttrs.getBoolean(R.styleable.PianoView_overlay_bitmaps, true);
-	    circleColor = pianoAttrs.getInteger(R.styleable.PianoView_overlay_color, Color.GREEN);
+	    circleColor = pianoAttrs.getColor(R.styleable.PianoView_overlay_color, Color.GREEN);
 	    circleRadius = pianoAttrs.getDimension(R.styleable.PianoView_overlay_circle_radius, TypedValue
 		    .applyDimension(TypedValue.COMPLEX_UNIT_DIP, 24, context.getResources().getDisplayMetrics()));
 	    circleTextSize = pianoAttrs.getDimension(R.styleable.PianoView_overlay_circle_text_size, TypedValue
@@ -199,9 +201,37 @@ public class PianoView extends View {
     // ==========
 
     @Override
-    public void draw(Canvas canvas) {
-	long start = System.currentTimeMillis();
+    public void computeScroll() {
+	super.computeScroll();
 
+	boolean needsInvalidate = false;
+	if (scroller.computeScrollOffset()) {
+	    xOffset = scroller.getCurrX();
+
+	    if (scroller.isOverScrolled()) {
+		if (xOffset > 0 && scrollDirection > 0 && !leftEdgeEffectActive) {
+		    leftEdgeEffect.onAbsorb(getCurrentVelocity());
+		    leftEdgeEffectActive = true;
+		    needsInvalidate = true;
+		} else if (xOffset < instrumentWidth - getMeasuredWidth() && scrollDirection < 0
+			&& !rightEdgeEffectActive) {
+		    rightEdgeEffect.onAbsorb(getCurrentVelocity());
+		    needsInvalidate = true;
+		}
+	    }
+	}
+
+	if (!scroller.isFinished()) {
+	    needsInvalidate = true;
+	}
+
+	if (needsInvalidate) {
+	    ViewCompat.postInvalidateOnAnimation(this);
+	}
+    }
+
+    @Override
+    public void draw(Canvas canvas) {
 	super.draw(canvas);
 	boolean needsInvalidate = false;
 
@@ -235,9 +265,6 @@ public class PianoView extends View {
 	    rightEdgeEffect.finish();
 	}
 
-	long end = System.currentTimeMillis();
-	Log.d(VIEW_LOG_TAG, "Drawing took: " + (end - start));
-
 	if (needsInvalidate) {
 	    ViewCompat.postInvalidateOnAnimation(this);
 	}
@@ -248,16 +275,6 @@ public class PianoView extends View {
 	if (isInEditMode()) {
 	    canvas.drawColor(Color.GRAY);
 	    return;
-	}
-
-	if (scroller.computeScrollOffset()) {
-	    xOffset = scroller.getCurrX();
-	}
-
-	if (scroller.isOverScrolled()) {
-	    if (Build.VERSION.SDK_INT > Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
-		absorbFling();
-	    }
 	}
 
 	if (measurementChanged) {
@@ -285,19 +302,14 @@ public class PianoView extends View {
 	}
 
 	canvas.restore();
-
-	if (!scroller.isFinished()) {
-	    ViewCompat.postInvalidateOnAnimation(this);
-	}
     }
 
     @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
-    private void absorbFling() {
-	if (flingDirection > 0) {
-	    leftEdgeEffect.onAbsorb((int) scroller.getCurrVelocity());
-	} else {
-	    rightEdgeEffect.onAbsorb((int) scroller.getCurrVelocity());
+    private int getCurrentVelocity() {
+	if (Build.VERSION.SDK_INT > Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
+	    return (int) scroller.getCurrVelocity();
 	}
+	return 0;
     }
 
     @Override
@@ -329,31 +341,19 @@ public class PianoView extends View {
 	int action = event.getAction();
 	if (action == MotionEvent.ACTION_CANCEL) {
 	    resetTouchFeedback();
-
-	    leftEdgeEffect.onRelease();
-	    rightEdgeEffect.onRelease();
+	    releaseEdgeEffects();
+	    xOffset = getOffsetInsideOfBounds();
 	    ViewCompat.postInvalidateOnAnimation(this);
 	}
 	if (action == MotionEvent.ACTION_UP) {
-	    if (xOffset < 0) {
-		xOffset = 0;
-	    }
-	    if (xOffset > instrumentWidth - getMeasuredWidth()) {
-		xOffset = instrumentWidth - getMeasuredWidth();
-	    }
-
-	    leftEdgeEffect.onRelease();
-	    rightEdgeEffect.onRelease();
+	    xOffset = getOffsetInsideOfBounds();
+	    releaseEdgeEffects();
 	    ViewCompat.postInvalidateOnAnimation(this);
 	}
 
-	boolean result = super.onTouchEvent(event);
-	result |= scaleGestureDetector.onTouchEvent(event);
-	if (!isScaling) {
-	    result |= gestureDetector.onTouchEvent(event);
-	}
-
-	return result;
+	boolean retVal = scaleGestureDetector.onTouchEvent(event);
+	retVal = gestureDetector.onTouchEvent(event) || retVal;
+	return retVal || super.onTouchEvent(event);
     }
 
     private void fireTouchListeners(int code) {
@@ -384,12 +384,10 @@ public class PianoView extends View {
 
 	@Override
 	public void onScaleEnd(ScaleGestureDetector detector) {
-	    isScaling = false;
 	}
 
 	@Override
 	public boolean onScaleBegin(ScaleGestureDetector detector) {
-	    isScaling = true;
 	    return true;
 	}
 
@@ -404,14 +402,21 @@ public class PianoView extends View {
 	    if (scaleX > 2) {
 		scaleX = 2;
 	    }
-	    invalidate();
+	    ViewCompat.postInvalidateOnAnimation(PianoView.this);
 	    return true;
 	}
     };
 
+    private void releaseEdgeEffects() {
+	leftEdgeEffectActive = rightEdgeEffectActive = false;
+	leftEdgeEffect.onRelease();
+	rightEdgeEffect.onRelease();
+    }
+
     private OnGestureListener gestureListener = new GestureDetector.SimpleOnGestureListener() {
 
 	public boolean onDown(MotionEvent e) {
+	    releaseEdgeEffects();
 	    scroller.forceFinished(true);
 	    if (keyboard.touchItem(e.getX() / scaleX + xOffset, e.getY())) {
 		invalidate();
@@ -421,11 +426,13 @@ public class PianoView extends View {
 	}
 
 	public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-	    flingDirection = velocityX > 0 ? 1 : -1;
+	    releaseEdgeEffects();
+	    scrollDirection = velocityX > 0 ? 1 : -1;
+
 	    scroller.fling(xOffset, 0, (int) -velocityX, 0, 0, instrumentWidth - getMeasuredWidth(), 0, 0);
 
 	    if (!awakenScrollBars()) {
-		invalidate();
+		ViewCompat.postInvalidateOnAnimation(PianoView.this);
 	    }
 	    return true;
 	}
@@ -436,9 +443,11 @@ public class PianoView extends View {
 
 	    if (xOffset < 0) {
 		leftEdgeEffect.onPull(distanceX / (float) getMeasuredWidth());
+		leftEdgeEffectActive = true;
 	    }
 	    if (xOffset > instrumentWidth - getMeasuredWidth()) {
 		rightEdgeEffect.onPull(distanceX / (float) getMeasuredWidth());
+		rightEdgeEffectActive = true;
 	    }
 
 	    if (!awakenScrollBars()) {
