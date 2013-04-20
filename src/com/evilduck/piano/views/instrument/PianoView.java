@@ -15,18 +15,26 @@
 package com.evilduck.piano.views.instrument;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
+import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
+import android.app.Service;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.support.v4.view.ViewCompat;
 import android.support.v4.widget.EdgeEffectCompat;
+import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.TypedValue;
@@ -36,11 +44,16 @@ import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.ScaleGestureDetector.OnScaleGestureListener;
 import android.view.View;
+import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityManager;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityNodeProvider;
 import android.widget.OverScroller;
 
 import com.evilduck.piano.R;
 import com.evilduck.piano.music.Note;
 
+@SuppressLint("NewApi")
 public class PianoView extends View {
 
     private int xOffset = 0;
@@ -75,10 +88,14 @@ public class PianoView extends View {
 
     private boolean rightEdgeEffectActive = false;
 
+    private AccessibilityManager mAccessibilityManager;
+
     public PianoView(Context context, AttributeSet attrs) {
 	super(context, attrs);
 
 	init();
+
+	mAccessibilityManager = (AccessibilityManager) context.getSystemService(Service.ACCESSIBILITY_SERVICE);
 
 	leftEdgeEffect = new EdgeEffectCompat(getContext());
 	rightEdgeEffect = new EdgeEffectCompat(getContext());
@@ -108,6 +125,8 @@ public class PianoView extends View {
 	}
 
 	keyboard = new Keyboard(getContext(), asBitmaps, circleColor, circleRadius, circleTextSize);
+
+	setFocusable(true);
     }
 
     public void addNotes(List<Note> notes) {
@@ -134,6 +153,293 @@ public class PianoView extends View {
 	    gestureDetector = new GestureDetector(getContext(), gestureListener);
 	    scaleGestureDetector = new ScaleGestureDetector(getContext(), scaleGestureListener);
 	}
+
+    }
+
+    @Override
+    public AccessibilityNodeProvider getAccessibilityNodeProvider() {
+	if (mAccessibilityNodeProvider == null) {
+	    mAccessibilityNodeProvider = new VirtualDescendantsProvider();
+	}
+	return mAccessibilityNodeProvider;
+    }
+
+    private VirtualDescendantsProvider mAccessibilityNodeProvider;
+
+    private class VirtualDescendantsProvider extends AccessibilityNodeProvider {
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public AccessibilityNodeInfo createAccessibilityNodeInfo(int virtualViewId) {
+	    AccessibilityNodeInfo info = null;
+	    if (virtualViewId == View.NO_ID) {
+		info = AccessibilityNodeInfo.obtain(PianoView.this);
+		info.setText("Piano Keyboard");
+		onInitializeAccessibilityNodeInfo(info);
+		Key[] children = keyboard.getKeysArray();
+		for (Key key : children) {
+		    info.addChild(PianoView.this, key.midiCode - Keyboard.START_MIDI_CODE);
+		}
+	    } else {
+		Key virtualView = keyboard.getKeysArray()[virtualViewId];
+		if (virtualView == null) {
+		    return null;
+		}
+
+		info = AccessibilityNodeInfo.obtain();
+		info.addAction(AccessibilityNodeInfo.ACTION_SELECT);
+		info.addAction(AccessibilityNodeInfo.ACTION_CLEAR_SELECTION);
+		info.addAction(AccessibilityNodeInfo.ACTION_FOCUS);
+		info.addAction(AccessibilityNodeInfo.ACTION_CLEAR_FOCUS);
+		info.addAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS);
+		info.addAction(AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS);
+		info.setPackageName(getContext().getPackageName());
+		info.setClassName(virtualView.getClass().getName());
+		info.setSource(PianoView.this, virtualViewId);
+
+		info.setEnabled(true);
+		info.setFocusable(true);
+		info.setClickable(true);
+
+		int[] location = new int[2];
+		getLocationOnScreen(location);
+
+		info.setBoundsInParent(new Rect((int) virtualView.startX, (int) virtualView.startY,
+			(int) virtualView.endX, (int) virtualView.endY));
+
+		info.setBoundsInScreen(new Rect((int) virtualView.startX + location[0], (int) virtualView.startY
+			+ location[1], (int) virtualView.endX + location[0], (int) virtualView.endY + location[1]));
+
+		info.setParent(PianoView.this);
+		info.setText("Midi code: " + virtualView.midiCode);
+	    }
+	    return info;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public List<AccessibilityNodeInfo> findAccessibilityNodeInfosByText(String searched, int virtualViewId) {
+	    if (TextUtils.isEmpty(searched)) {
+		return Collections.emptyList();
+	    }
+	    String searchedLowerCase = searched.toLowerCase(Locale.getDefault());
+	    List<AccessibilityNodeInfo> result = null;
+	    if (virtualViewId == View.NO_ID) {
+		List<Key> children = Arrays.asList(keyboard.getKeysArray());
+		final int childCount = children.size();
+		for (int i = 0; i < childCount; i++) {
+		    Key child = children.get(i);
+		    String textToLowerCase = ("Midi code: " + child.midiCode).toLowerCase(Locale.getDefault());
+		    if (textToLowerCase.contains(searchedLowerCase)) {
+			if (result == null) {
+			    result = new ArrayList<AccessibilityNodeInfo>();
+			}
+			result.add(createAccessibilityNodeInfo(child.midiCode));
+		    }
+		}
+	    } else {
+		Key virtualView = keyboard.getKeysArray()[virtualViewId];
+		if (virtualView != null) {
+		    String textToLowerCase = ("Midi code: " + virtualView.midiCode).toLowerCase(Locale.getDefault());
+		    if (textToLowerCase.contains(searchedLowerCase)) {
+			result = new ArrayList<AccessibilityNodeInfo>();
+			result.add(createAccessibilityNodeInfo(virtualViewId));
+		    }
+		}
+	    }
+	    if (result == null) {
+		return Collections.emptyList();
+	    }
+	    return result;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public boolean performAction(int virtualViewId, int action, Bundle arguments) {
+	    if (virtualViewId == View.NO_ID) {
+		// Perform the action on the host View.
+		switch (action) {
+		case AccessibilityNodeInfo.ACTION_SELECT:
+		    if (!isSelected()) {
+			setSelected(true);
+			return isSelected();
+		    }
+		    break;
+		case AccessibilityNodeInfo.ACTION_CLEAR_SELECTION:
+		    if (isSelected()) {
+			setSelected(false);
+			return !isSelected();
+		    }
+		    break;
+		case AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS: {
+		    sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED);
+		    invalidate();
+		    break;
+		}
+		case AccessibilityNodeInfo.ACTION_NEXT_AT_MOVEMENT_GRANULARITY: {
+		    sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED);
+		    invalidate();
+		    break;
+		}
+		}
+	    } else {
+		// Find the view that corresponds to the given id.
+		Key child = keyboard.getKeysArray()[virtualViewId];
+		if (child == null) {
+		    return false;
+		}
+		// Perform the action on a virtual view.
+		switch (action) {
+		case AccessibilityNodeInfo.ACTION_SELECT:
+		    setVirtualViewSelected(child, true);
+		    invalidate();
+		    return true;
+		case AccessibilityNodeInfo.ACTION_CLEAR_SELECTION:
+		    setVirtualViewSelected(child, false);
+		    invalidate();
+		    return true;
+		case AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS: {
+		    setVirtualViewSelected(child, true);
+		    // sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED);
+		    invalidate();
+		    break;
+		}
+		case AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS: {
+		    setVirtualViewSelected(child, false);
+		    // sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED);
+		    invalidate();
+		    break;
+		}
+		}
+	    }
+	    return false;
+	}
+    }
+
+    Key mLastHoveredChild;
+
+    @SuppressLint("NewApi")
+    @Override
+    public boolean dispatchHoverEvent(MotionEvent event) {
+	// This implementation assumes that the virtual children
+	// cannot overlap and are always visible. Do NOT use this
+	// code as a reference of how to implement hover event
+	// dispatch. Instead, refer to ViewGroup#dispatchHoverEvent.
+	boolean handled = false;
+	List<Key> children = Arrays.asList(keyboard.getKeysArray());
+	final int childCount = children.size();
+	for (int i = 0; i < childCount; i++) {
+	    Key child = children.get(i);
+	    Rect childBounds = new Rect((int) child.startX, (int) child.startY, (int) child.endX, (int) child.endY);
+	    final int childCoordsX = (int) event.getX() + getScrollX();
+	    final int childCoordsY = (int) event.getY() + getScrollY();
+	    if (!childBounds.contains(childCoordsX, childCoordsY)) {
+		continue;
+	    }
+	    final int action = event.getAction();
+	    switch (action) {
+	    case MotionEvent.ACTION_HOVER_ENTER: {
+		mLastHoveredChild = child;
+		handled |= onHoverVirtualView(child, event);
+		event.setAction(action);
+	    }
+		break;
+	    case MotionEvent.ACTION_HOVER_MOVE: {
+		if (child == mLastHoveredChild) {
+		    handled |= onHoverVirtualView(child, event);
+		    event.setAction(action);
+		} else {
+		    MotionEvent eventNoHistory = event.getHistorySize() > 0 ? MotionEvent.obtainNoHistory(event)
+			    : event;
+		    eventNoHistory.setAction(MotionEvent.ACTION_HOVER_EXIT);
+		    onHoverVirtualView(mLastHoveredChild, eventNoHistory);
+		    eventNoHistory.setAction(MotionEvent.ACTION_HOVER_ENTER);
+		    onHoverVirtualView(child, eventNoHistory);
+		    mLastHoveredChild = child;
+		    eventNoHistory.setAction(MotionEvent.ACTION_HOVER_MOVE);
+		    handled |= onHoverVirtualView(child, eventNoHistory);
+		    if (eventNoHistory != event) {
+			eventNoHistory.recycle();
+		    } else {
+			event.setAction(action);
+		    }
+		}
+	    }
+		break;
+	    case MotionEvent.ACTION_HOVER_EXIT: {
+		mLastHoveredChild = null;
+		handled |= onHoverVirtualView(child, event);
+		event.setAction(action);
+	    }
+		break;
+	    }
+	}
+	if (!handled) {
+	    handled |= onHoverEvent(event);
+	}
+	return handled;
+    }
+
+    private boolean onHoverVirtualView(Key virtualView, MotionEvent event) {
+	// The implementation of hover event dispatch can be implemented
+	// in any way that is found suitable. However, each virtual View
+	// should fire a corresponding accessibility event whose source
+	// is that virtual view. Accessibility services get the event source
+	// as the entry point of the APIs for querying the window content.
+	final int action = event.getAction();
+	switch (action) {
+	case MotionEvent.ACTION_HOVER_ENTER: {
+	    sendAccessibilityEventForVirtualView(virtualView, AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED);
+	}
+	    break;
+	case MotionEvent.ACTION_HOVER_EXIT: {
+	    sendAccessibilityEventForVirtualView(virtualView, AccessibilityEvent.TYPE_VIEW_HOVER_EXIT);
+	}
+	    break;
+	}
+	return true;
+    }
+
+    /**
+     * Sends a properly initialized accessibility event for a virtual view..
+     * 
+     * @param virtualView
+     *            The virtual view.
+     * @param eventType
+     *            The type of the event to send.
+     */
+    private void sendAccessibilityEventForVirtualView(Key virtualView, int eventType) {
+	// If touch exploration, i.e. the user gets feedback while touching
+	// the screen, is enabled we fire accessibility events.
+	if (mAccessibilityManager.isTouchExplorationEnabled()) {
+	    AccessibilityEvent event = AccessibilityEvent.obtain(eventType);
+	    event.setPackageName(getContext().getPackageName());
+	    event.setClassName(virtualView.getClass().getName());
+	    event.setSource(PianoView.this, virtualView.midiCode - Keyboard.START_MIDI_CODE);
+	    event.setChecked(true);
+	    event.setEnabled(true);
+	    event.setAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS);
+	    event.setCurrentItemIndex(virtualView.midiCode - Keyboard.START_MIDI_CODE);
+
+	    Note n = Note.fromCode(virtualView.midiCode);
+	    event.getText().add(n.toString());
+	    getParent().requestSendAccessibilityEvent(PianoView.this, event);
+	}
+    }
+
+    @Override
+    public void sendAccessibilityEvent(int eventType) {
+	super.sendAccessibilityEvent(eventType);
+    }
+
+    private void setVirtualViewSelected(Key virtualView, boolean selected) {
+	virtualView.pressed = selected;
     }
 
     public void smoothScrollXTo(int x) {
@@ -271,11 +577,12 @@ public class PianoView extends View {
     }
 
     @Override
-    protected void onDraw(Canvas canvas) {
-	if (isInEditMode()) {
-	    canvas.drawColor(Color.GRAY);
-	    return;
-	}
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+	canvasWidth = MeasureSpec.getSize(widthMeasureSpec);
+	measurementChanged = true;
+	Log.d(VIEW_LOG_TAG, "measurement changed");
+
+	super.onMeasure(widthMeasureSpec, heightMeasureSpec);
 
 	if (measurementChanged) {
 	    measurementChanged = false;
@@ -287,6 +594,25 @@ public class PianoView extends View {
 	    float ratio = (float) instrumentWidth / oldInstrumentWidth;
 	    xOffset = (int) (xOffset * ratio);
 	}
+    }
+
+    @Override
+    protected void onDraw(Canvas canvas) {
+	if (isInEditMode()) {
+	    canvas.drawColor(Color.GRAY);
+	    return;
+	}
+
+	// if (measurementChanged) {
+	// measurementChanged = false;
+	// keyboard.initializeInstrument(getMeasuredHeight(), getContext());
+	//
+	// float oldInstrumentWidth = instrumentWidth;
+	// instrumentWidth = keyboard.getWidth();
+	//
+	// float ratio = (float) instrumentWidth / oldInstrumentWidth;
+	// xOffset = (int) (xOffset * ratio);
+	// }
 
 	int localXOffset = getOffsetInsideOfBounds();
 
@@ -310,15 +636,6 @@ public class PianoView extends View {
 	    return (int) scroller.getCurrVelocity();
 	}
 	return 0;
-    }
-
-    @Override
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-	canvasWidth = MeasureSpec.getSize(widthMeasureSpec);
-	measurementChanged = true;
-	Log.d(VIEW_LOG_TAG, "measurement changed");
-
-	super.onMeasure(widthMeasureSpec, heightMeasureSpec);
     }
 
     @Override

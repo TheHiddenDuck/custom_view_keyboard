@@ -39,7 +39,7 @@ class Keyboard {
 
     private static final int OCTAVES = 4;
 
-    private static final int START_MIDI_CODE = Note.C.inOctave(2).getMidiCode();
+    static final int START_MIDI_CODE = Note.C.inOctave(2).getMidiCode();
 
     private static final int KEYS_IN_OCTAVE = 12;
 
@@ -88,6 +88,10 @@ class Keyboard {
     private Rect src;
 
     private RectF dst;
+
+    public Key[] getKeysArray() {
+	return keysArray;
+    }
 
     public int getTouchedCode() {
 	return touchedKey + START_MIDI_CODE;
