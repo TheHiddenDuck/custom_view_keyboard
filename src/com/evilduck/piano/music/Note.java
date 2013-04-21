@@ -14,6 +14,8 @@
  */
 package com.evilduck.piano.music;
 
+import java.util.Locale;
+
 /**
  * Class represents a single note.
  * 
@@ -92,6 +94,21 @@ public final class Note implements Comparable<Note> {
 	}
 
 	return NOTES[note] + (modifierString != null ? modifierString : "");
+    }
+
+    public String getAudibleName() {
+	String modifierString = null;
+	switch (modifier) {
+	case SHARP:
+	    modifierString = "sharp";
+	    break;
+	case FLAT:
+	    modifierString = "flat";
+	    break;
+	}
+
+	return String.valueOf(NOTES[note]).toLowerCase(Locale.getDefault()) + " "
+		+ (modifierString != null ? modifierString : "");
     }
 
     @Override
