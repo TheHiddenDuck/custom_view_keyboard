@@ -103,6 +103,9 @@ public class PianoDemoActivity extends Activity {
 	va.addUpdateListener(new AnimatorUpdateListener() {
 	    @Override
 	    public void onAnimationUpdate(ValueAnimator animation) {
+	    	// NOTE: This is done purely to showcase that component quickly changes it's size 
+	    	// and keys resize correctly. In normal case you never want to do 
+	    	// layout in animation frames of course.
 		pianoView.getLayoutParams().height = (Integer) animation.getAnimatedValue();
 		pianoView.requestLayout();
 	    }
@@ -117,6 +120,9 @@ public class PianoDemoActivity extends Activity {
 	va.addUpdateListener(new AnimatorUpdateListener() {
 	    @Override
 	    public void onAnimationUpdate(ValueAnimator animation) {
+	    	// NOTE: This is done purely to showcase that component quickly changes it's size 
+	    	// and keys resize correctly. In normal case you never want to do 
+	    	// layout in animation frames of course.
 		pianoView.getLayoutParams().height = (Integer) animation.getAnimatedValue();
 		pianoView.requestLayout();
 	    }
